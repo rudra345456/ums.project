@@ -28,7 +28,6 @@ export default function LoginModal({ open, onClose }) {
 
   const submit = async (e) => {
     e.preventDefault()
-    console.log('🔍 Login submit - Current tab:', tab)
     if (!input.id || !input.password || !input.captcha) {
       setError('Please fill all fields')
       return
@@ -40,46 +39,61 @@ export default function LoginModal({ open, onClose }) {
       return
     }
     
-    // STUDENT LOGIN: Use actual authentication from students.js
-    if (tab === 'student') {
-      console.log('🔵 Student login detected - using authentication')
+    // CRITICAL: Handle student login with local authentication (NO API CALL EVER)
+    // Check IMMEDIATELY and return early to prevent any API calls
+    // This MUST execute before any API code can run
+    const isStudentLogin = tab === 'student'
+    
+    if (isStudentLogin) {
+      // Use local authentication - no API calls for students
       const studentId = input.id.trim()
       const password = input.password.trim()
-      
-      // Authenticate student using students.js data
       const student = authenticateStudent(studentId, password)
       
       if (student) {
-        console.log('✅ Student login successful:', student.id)
+        // Store student data in localStorage
         localStorage.setItem('student', JSON.stringify(student))
+        // Trigger student login success
         window.dispatchEvent(new CustomEvent('studentLoginSuccess', { detail: student }))
         onClose()
+        return // MUST return here - prevents any API call
       } else {
-        setError('Invalid Student ID or Password')
+        setError('Invalid Student ID or Password. Please check your credentials.')
         setCaptcha(generateCaptcha())
         setInput({...input, captcha:''})
+        return // MUST return here - prevents any API call
       }
-      
-      // Return immediately - student login uses local authentication
+    }
+    
+    // IMPORTANT: Only faculty login reaches this point
+    // Student login should NEVER reach here due to early return above
+    
+    // Final safety checks - NEVER make API call if this is student login
+    if (isStudentLogin || tab === 'student') {
+      console.error('CRITICAL ERROR: Student login reached API call section! Tab:', tab)
+      setError('System error: Student login should use local authentication')
       return
     }
     
-    // FACULTY LOGIN ONLY: Uses API - ONLY executes if tab === 'faculty'
-    // Student login NEVER reaches here due to return statement above
-    if (tab === 'faculty') {
-      console.log('🟡 Faculty login detected - using API')
-      try {
-        const response = await fetch('http://127.0.0.1:5000/api/auth/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: input.id,
-            password: input.password
-          })
+    // Only proceed with API call if tab is definitely 'faculty'
+    if (tab !== 'faculty') {
+      console.error('Unexpected tab value:', tab, 'Expected: faculty')
+      setError('Please select a login type')
+      return
+    }
+    
+    try {
+      const response = await fetch('http://127.0.0.1:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: input.id,
+          password: input.password
         })
-        
+      })
+      
         const data = await response.json()
         
         if (data.ok) {
@@ -97,14 +111,13 @@ export default function LoginModal({ open, onClose }) {
           setInput({...input, captcha:''})
         }
       } catch (error) {
-        console.error('Faculty login error:', error)
+        console.error('Login error:', error)
         setError('Network error. Please try again.')
         setCaptcha(generateCaptcha())
         setInput({...input, captcha:''})
       }
     } else {
       // Unknown tab state - should not happen
-      console.error('⚠️ Unknown tab state:', tab)
       setError('Please select a login type')
     }
   }
@@ -142,13 +155,8 @@ export default function LoginModal({ open, onClose }) {
               </div>
             </div>
             <form className="modal-body" onSubmit={submit}>
-              <label>{tab === 'student' ? 'Student ID' : 'Email'}</label>
-              <input 
-                placeholder={tab === 'student' ? 'Enter your Student ID (e.g., 2335000001)' : 'Enter your Email'} 
-                value={input.id} 
-                onChange={(e)=>setInput({...input, id:e.target.value})} 
-                required 
-              />
+              <label>Login ID</label>
+              <input placeholder="Enter your User ID" value={input.id} onChange={(e)=>setInput({...input, id:e.target.value})} required />
               <label>Password</label>
               <input type="password" placeholder="Enter your password" value={input.password} onChange={(e)=>setInput({...input, password:e.target.value})} required />
               <label>Captcha</label>

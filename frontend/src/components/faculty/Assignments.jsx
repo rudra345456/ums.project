@@ -1,82 +1,121 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function Assignments() {
   const [activeTab, setActiveTab] = useState('all')
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [user, setUser] = useState(null)
+  const [subjects, setSubjects] = useState([])
+  const [assignments, setAssignments] = useState([])
+  const [loading, setLoading] = useState(false)
   
   const [newAssignment, setNewAssignment] = useState({
     title: '',
     description: '',
     dueDate: '',
-    maxMarks: '',
-    subject: '',
-    type: 'homework'
+    maxMarks: 100,
+    subjectId: ''
   })
 
-  const assignments = [
-    {
-      id: 1,
-      title: 'Data Structures Lab Assignment',
-      subject: 'CS-201',
-      type: 'lab',
-      dueDate: '2024-01-15',
-      maxMarks: 100,
-      submissions: 35,
-      totalStudents: 45,
-      status: 'active'
-    },
-    {
-      id: 2,
-      title: 'Algorithm Analysis Report',
-      subject: 'CS-301',
-      type: 'report',
-      dueDate: '2024-01-20',
-      maxMarks: 50,
-      submissions: 42,
-      totalStudents: 45,
-      status: 'active'
-    },
-    {
-      id: 3,
-      title: 'Database Design Project',
-      subject: 'CS-401',
-      type: 'project',
-      dueDate: '2024-01-10',
-      maxMarks: 200,
-      submissions: 40,
-      totalStudents: 40,
-      status: 'graded'
-    },
-    {
-      id: 4,
-      title: 'Software Engineering Quiz',
-      subject: 'CS-501',
-      type: 'quiz',
-      dueDate: '2024-01-12',
-      maxMarks: 25,
-      submissions: 38,
-      totalStudents: 40,
-      status: 'graded'
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user')
+    if (savedUser) {
+      const u = JSON.parse(savedUser)
+      setUser(u)
+      if (u.role === 'teacher') {
+        loadSubjects(u.id)
+        loadAssignments(u.id)
+      }
     }
-  ]
+  }, [])
+
+  const loadSubjects = async (teacherId) => {
+    try {
+      const res = await fetch(`http://127.0.0.1:5000/api/teacher/${teacherId}/subjects`)
+      const data = await res.json()
+      if (data.ok) setSubjects(data.subjects)
+    } catch (e) {}
+  }
+
+  const loadAssignments = async (teacherId) => {
+    setLoading(true)
+    try {
+      const res = await fetch(`http://127.0.0.1:5000/api/teacher/${teacherId}/assignments`)
+      const data = await res.json()
+      if (data.ok) setAssignments(data.assignments)
+    } catch (e) {}
+    setLoading(false)
+  }
+
+  const handleCreateAssignment = async (e) => {
+    e.preventDefault()
+    if (!user) return
+    try {
+      const res = await fetch('http://127.0.0.1:5000/api/assignments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newAssignment.title,
+          description: newAssignment.description,
+          subject_id: Number(newAssignment.subjectId),
+          teacher_id: user.id,
+          due_date: newAssignment.dueDate,
+          max_marks: Number(newAssignment.maxMarks) || 100
+        })
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setShowCreateForm(false)
+        setNewAssignment({ title: '', description: '', dueDate: '', maxMarks: 100, subjectId: '' })
+        loadAssignments(user.id)
+      } else {
+        alert(data.message || 'Failed to create assignment')
+      }
+    } catch (e) {
+      alert('Network error creating assignment')
+    }
+  }
+
+  const quickAddMathAssignments = async () => {
+    if (!user) return
+    const math = subjects.find(s => (s.name || '').toLowerCase().includes('math'))
+    if (!math) {
+      alert('No Mathematics subject found for this teacher.')
+      return
+    }
+    const payloads = [
+      {
+        title: 'Mathematics Homework 1',
+        description: 'Problems on algebra and linear equations',
+        subject_id: math.id,
+        teacher_id: user.id,
+        due_date: new Date(Date.now()+3*86400000).toISOString().slice(0,10),
+        max_marks: 50,
+      },
+      {
+        title: 'Mathematics Quiz 1',
+        description: 'Short quiz on calculus basics',
+        subject_id: math.id,
+        teacher_id: user.id,
+        due_date: new Date(Date.now()+5*86400000).toISOString().slice(0,10),
+        max_marks: 25,
+      }
+    ]
+    try {
+      for (const p of payloads) {
+        await fetch('http://127.0.0.1:5000/api/assignments/create', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p)
+        })
+      }
+      loadAssignments(user.id)
+      alert('Two Mathematics assignments added')
+    } catch (e) {
+      alert('Failed to add sample assignments')
+    }
+  }
 
   const filteredAssignments = activeTab === 'all' 
     ? assignments 
-    : assignments.filter(assignment => assignment.status === activeTab)
-
-  const handleCreateAssignment = (e) => {
-    e.preventDefault()
-    console.log('Creating assignment:', newAssignment)
-    setShowCreateForm(false)
-    setNewAssignment({
-      title: '',
-      description: '',
-      dueDate: '',
-      maxMarks: '',
-      subject: '',
-      type: 'homework'
-    })
-  }
+    : assignments.filter(assignment => (assignment.status || 'active') === activeTab)
 
   const getTypeIcon = (type) => {
     switch(type) {
@@ -109,6 +148,12 @@ export default function Assignments() {
           >
             + Create Assignment
           </button>
+          <button 
+            className="btn-secondary"
+            onClick={quickAddMathAssignments}
+          >
+            + Add 2 Math Assignments
+          </button>
         </div>
       </div>
 
@@ -123,13 +168,13 @@ export default function Assignments() {
           className={`tab-btn ${activeTab === 'active' ? 'active' : ''}`}
           onClick={() => setActiveTab('active')}
         >
-          Active ({assignments.filter(a => a.status === 'active').length})
+          Active ({assignments.length})
         </button>
         <button 
           className={`tab-btn ${activeTab === 'graded' ? 'active' : ''}`}
           onClick={() => setActiveTab('graded')}
         >
-          Graded ({assignments.filter(a => a.status === 'graded').length})
+          Graded (0)
         </button>
       </div>
 
@@ -158,12 +203,16 @@ export default function Assignments() {
                 </div>
                 <div className="form-group">
                   <label>Subject</label>
-                  <input 
-                    type="text" 
-                    value={newAssignment.subject}
-                    onChange={(e) => setNewAssignment({...newAssignment, subject: e.target.value})}
+                  <select 
+                    value={newAssignment.subjectId}
+                    onChange={(e) => setNewAssignment({...newAssignment, subjectId: e.target.value})}
                     required
-                  />
+                  >
+                    <option value="">Select Subject</option>
+                    {subjects.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               
@@ -196,19 +245,6 @@ export default function Assignments() {
                     required
                   />
                 </div>
-                <div className="form-group">
-                  <label>Type</label>
-                  <select 
-                    value={newAssignment.type}
-                    onChange={(e) => setNewAssignment({...newAssignment, type: e.target.value})}
-                  >
-                    <option value="homework">Homework</option>
-                    <option value="lab">Lab Assignment</option>
-                    <option value="project">Project</option>
-                    <option value="quiz">Quiz</option>
-                    <option value="report">Report</option>
-                  </select>
-                </div>
               </div>
 
               <div className="form-actions">
@@ -224,47 +260,37 @@ export default function Assignments() {
         </div>
       )}
 
+      {loading && <div>Loading assignments...</div>}
+
       <div className="assignments-grid">
         {filteredAssignments.map(assignment => (
           <div key={assignment.id} className="assignment-card">
             <div className="assignment-header">
               <div className="assignment-title">
-                <span className="type-icon">{getTypeIcon(assignment.type)}</span>
+                <span className="type-icon">{getTypeIcon('homework')}</span>
                 {assignment.title}
               </div>
-              <div className={`assignment-status ${assignment.status}`}>
-                {assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
+              <div className={`assignment-status ${assignment.status || 'active'}`}>
+                {(assignment.status || 'active').charAt(0).toUpperCase() + (assignment.status || 'active').slice(1)}
               </div>
             </div>
 
             <div className="assignment-details">
               <div className="detail-item">
                 <span className="detail-label">Subject:</span>
-                <span className="detail-value">{assignment.subject}</span>
+                <span className="detail-value">{assignment.subject_name || ''}</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Due Date:</span>
-                <span className="detail-value">{assignment.dueDate}</span>
+                <span className="detail-value">{assignment.due_date}</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Max Marks:</span>
-                <span className="detail-value">{assignment.maxMarks}</span>
+                <span className="detail-value">{assignment.max_marks}</span>
               </div>
-              <div className="detail-item">
-                <span className="detail-label">Submissions:</span>
-                <span className="detail-value">{assignment.submissions}/{assignment.totalStudents}</span>
-              </div>
-            </div>
-
-            <div className="progress-bar">
-              <div 
-                className="progress-fill" 
-                style={{width: `${(assignment.submissions / assignment.totalStudents) * 100}%`}}
-              ></div>
             </div>
 
             <div className="assignment-actions">
-              <button className="btn-primary">View Submissions</button>
               <button className="btn-secondary">Edit</button>
               <button className="btn-danger">Delete</button>
             </div>

@@ -36,7 +36,6 @@ export default function MegaMenu({ onLogin }) {
           <li className="menu-item">Research & Innovation</li>
         </div>
         <div style={{display:'flex',gap:12,alignItems:'center'}}>
-          <input placeholder="Search" style={{height:30,padding:'4px 10px',borderRadius:8,border:'1px solid #999'}} />
           <button className="pill" style={{margin:0}} onClick={onLogin}>Login</button>
           <button className="pill pill-green" style={{margin:0}}>☰</button>
         </div>

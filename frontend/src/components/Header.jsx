@@ -1,5 +1,14 @@
+import { useState } from 'react'
 import Logo from './Logo.jsx'
-export default function Header({ onLogin }) {
+import HamburgerMenu from './HamburgerMenu.jsx'
+
+export default function Header({ onLogin, onRollingAd, onAdmissionOpen, onMenuNavigate }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  
+  // Ensure handlers have defaults
+  const handleMenuNavigate = onMenuNavigate || (() => {})
+  
+  
   return (
     <>
        <div className="top-ribbon">
@@ -8,9 +17,42 @@ export default function Header({ onLogin }) {
            <span className="badge">Accredited with A+ Grade by NAAC</span>
          </div>
         <div className="cta-group">
-          <button className="pill">Admission Open</button>
-          <button className="pill">Rolling Advertisement</button>
-          <button className="pill pill-yellow">Student</button>
+          <button 
+            type="button"
+            className="pill" 
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              if (onAdmissionOpen && typeof onAdmissionOpen === 'function') {
+                onAdmissionOpen()
+              }
+            }}
+            style={{ pointerEvents: 'auto', position: 'relative', zIndex: 15 }}
+          >
+            Admission Open
+          </button>
+          <button 
+            type="button"
+            className="pill" 
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              if (onRollingAd && typeof onRollingAd === 'function') {
+                onRollingAd()
+              }
+            }}
+            style={{ pointerEvents: 'auto', position: 'relative', zIndex: 15 }}
+          >
+            Rolling Advertisement
+          </button>
+          <button 
+            type="button"
+            className="pill pill-yellow" 
+            onClick={onLogin || (() => {})}
+            style={{ cursor: 'pointer' }}
+          >
+            Student
+          </button>
           <button className="pill pill-yellow">Examination</button>
           <button className="pill pill-yellow">IQAC</button>
           <button className="pill pill-yellow">NRPP</button>
@@ -55,12 +97,44 @@ export default function Header({ onLogin }) {
             <li className="menu-item">Research & Innovation</li>
           </div>
           <div style={{display:'flex',gap:12,alignItems:'center'}}>
-            <input placeholder="Search" style={{height:30,padding:'4px 10px',borderRadius:8,border:'1px solid #999'}} />
             <button className="pill" style={{margin:0}} onClick={onLogin}>Login</button>
-            <button className="pill pill-green" style={{margin:0}}>☰</button>
+            <button 
+              type="button"
+              className="pill pill-green hamburger-btn" 
+              id="hamburger-menu-btn"
+              style={{
+                margin: 0, 
+                pointerEvents: 'auto', 
+                position: 'relative', 
+                zIndex: 10003,
+                cursor: 'pointer',
+                minWidth: '40px',
+                height: '32px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                border: 'none',
+                outline: 'none'
+              }}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setMenuOpen(true)
+              }}
+              aria-label="Open menu"
+              aria-expanded={menuOpen}
+            >
+              ☰
+            </button>
           </div>
         </ul>
       </nav>
+      <HamburgerMenu 
+        isOpen={menuOpen} 
+        onClose={() => setMenuOpen(false)}
+        onNavigate={handleMenuNavigate}
+      />
     </>
   )
 }
